@@ -1,0 +1,19 @@
+// ============================================================================
+// .dockerignore
+// ============================================================================
+
+
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.gitignore
+README.md
+.vscode
+.idea
+logs
+*.log
+coverage
+.nyc_output
+
