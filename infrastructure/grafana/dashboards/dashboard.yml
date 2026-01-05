@@ -1,0 +1,17 @@
+# ============================================================================
+# FILE 3: infrastructure/grafana/dashboards/dashboard.yml
+# ============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'Kynda Call System'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+

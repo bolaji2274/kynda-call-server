@@ -1,0 +1,368 @@
+# ============================================================================
+# FILE 1: infrastructure/prometheus/prometheus.yml
+# ============================================================================
+
+global:
+  scrape_interval: 15s # How often to scrape targets
+  evaluation_interval: 15s # How often to evaluate rules
+  external_labels:
+    monitor: 'kynda-call-monitor'
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "alert_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Kynda Backend API
+  - job_name: 'kynda-backend'
+    static_configs:
+      - targets: ['backend:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # MongoDB Exporter (if you add it later)
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+
+  # Redis Exporter (if you add it later)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Node Exporter (if you add it later for system metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+
+# ============================================================================
+# FILE 3: infrastructure/grafana/dashboards/dashboard.yml
+# ============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'Kynda Call System'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+
+# ============================================================================
+# FILE 4: infrastructure/grafana/dashboards/kynda-dashboard.json
+# ============================================================================
+
+# This is a basic Grafana dashboard JSON
+# Copy this content to: infrastructure/grafana/dashboards/kynda-dashboard.json
+
+{
+  "dashboard": {
+    "title": "Kynda Call System",
+    "tags": ["kynda", "webrtc"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Connections",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "kynda_active_sessions",
+            "legendFormat": "Active Sessions"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Bandwidth Usage",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(kynda_bandwidth_bytes[5m])",
+            "legendFormat": "Bandwidth"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Connection Quality",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "avg(kynda_quality_score)",
+            "legendFormat": "Avg Quality"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Packet Loss",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+        "targets": [
+          {
+            "expr": "avg(kynda_packet_loss)",
+            "legendFormat": "Packet Loss %"
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}
+
+# ============================================================================
+# FILE 5: backend/src/services/metrics.service.js (FOR PROMETHEUS METRICS)
+# ============================================================================
+
+# Copy this JavaScript code to: backend/src/services/metrics.service.js
+
+const promClient = require('prom-client');
+
+class MetricsService {
+  constructor() {
+    this.register = new promClient.Registry();
+    
+    // Set default labels
+    this.register.setDefaultLabels({
+      app: 'kynda-call-server',
+    });
+
+    // Collect default metrics (CPU, memory, etc.)
+    promClient.collectDefaultMetrics({ register: this.register });
+
+    // Custom metrics
+    this.initCustomMetrics();
+  }
+
+  initCustomMetrics() {
+    // Active sessions gauge
+    this.activeSessions = new promClient.Gauge({
+      name: 'kynda_active_sessions',
+      help: 'Number of active call sessions',
+      registers: [this.register],
+    });
+
+    // Bandwidth histogram
+    this.bandwidth = new promClient.Histogram({
+      name: 'kynda_bandwidth_bytes',
+      help: 'Bandwidth usage in bytes',
+      buckets: [1000, 5000, 10000, 50000, 100000, 500000, 1000000],
+      registers: [this.register],
+    });
+
+    // Connection quality gauge
+    this.qualityScore = new promClient.Gauge({
+      name: 'kynda_quality_score',
+      help: 'Connection quality score (0-100)',
+      labelNames: ['room_id'],
+      registers: [this.register],
+    });
+
+    // Packet loss gauge
+    this.packetLoss = new promClient.Gauge({
+      name: 'kynda_packet_loss',
+      help: 'Packet loss percentage',
+      labelNames: ['room_id'],
+      registers: [this.register],
+    });
+
+    // Call duration histogram
+    this.callDuration = new promClient.Histogram({
+      name: 'kynda_call_duration_seconds',
+      help: 'Duration of calls in seconds',
+      buckets: [60, 300, 600, 1800, 3600, 7200],
+      registers: [this.register],
+    });
+
+    // API request counter
+    this.httpRequests = new promClient.Counter({
+      name: 'kynda_http_requests_total',
+      help: 'Total HTTP requests',
+      labelNames: ['method', 'route', 'status'],
+      registers: [this.register],
+    });
+
+    // WebSocket connections gauge
+    this.wsConnections = new promClient.Gauge({
+      name: 'kynda_websocket_connections',
+      help: 'Number of active WebSocket connections',
+      registers: [this.register],
+    });
+  }
+
+  // Update methods
+  setActiveSessions(count) {
+    this.activeSessions.set(count);
+  }
+
+  recordBandwidth(bytes) {
+    this.bandwidth.observe(bytes);
+  }
+
+  setQualityScore(roomId, score) {
+    this.qualityScore.set({ room_id: roomId }, score);
+  }
+
+  setPacketLoss(roomId, loss) {
+    this.packetLoss.set({ room_id: roomId }, loss);
+  }
+
+  recordCallDuration(seconds) {
+    this.callDuration.observe(seconds);
+  }
+
+  incrementHttpRequests(method, route, status) {
+    this.httpRequests.inc({ method, route, status });
+  }
+
+  setWsConnections(count) {
+    this.wsConnections.set(count);
+  }
+
+  // Get metrics for Prometheus
+  async getMetrics() {
+    return await this.register.metrics();
+  }
+
+  // Get content type
+  getContentType() {
+    return this.register.contentType;
+  }
+}
+
+module.exports = new MetricsService();
+
+# ============================================================================
+# FILE 6: Add metrics endpoint to backend/src/app.js
+# ============================================================================
+
+# Add this to your backend/src/app.js (after other routes):
+
+const metricsService = require('./services/metrics.service');
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', metricsService.getContentType());
+    res.end(await metricsService.getMetrics());
+  } catch (error) {
+    res.status(500).end(error.message);
+  }
+});
+
+# ============================================================================
+# FILE 7: Add metrics middleware to track HTTP requests
+# ============================================================================
+
+# Add this middleware in backend/src/app.js (before routes):
+
+// Metrics middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    metricsService.incrementHttpRequests(
+      req.method,
+      req.route?.path || req.path,
+      res.statusCode
+    );
+  });
+  
+  next();
+});
+
+# ============================================================================
+# INSTALLATION INSTRUCTIONS
+# ============================================================================
+
+# 1. Create Prometheus directory structure:
+mkdir -p infrastructure/prometheus
+mkdir -p infrastructure/grafana/{datasources,dashboards}
+
+# 2. Copy prometheus.yml to:
+infrastructure/prometheus/prometheus.yml
+
+# 3. Copy datasource config to:
+infrastructure/grafana/datasources/prometheus.yml
+
+# 4. Copy dashboard config to:
+infrastructure/grafana/dashboards/dashboard.yml
+
+# 5. Copy dashboard JSON to:
+infrastructure/grafana/dashboards/kynda-dashboard.json
+
+# 6. Copy metrics.service.js to:
+backend/src/services/metrics.service.js
+
+# 7. Update backend/src/app.js:
+#    - Add metrics endpoint
+#    - Add metrics middleware
+
+# 8. Install prom-client in backend:
+cd backend
+npm install prom-client
+
+# 9. Prometheus & Grafana are already in docker-compose.yml!
+#    Just start: docker-compose up -d
+
+# 10. Access:
+#     - Prometheus: http://localhost:9090
+#     - Grafana: http://localhost:3001 (admin/admin123)
+
+# ============================================================================
+# VERIFICATION
+# ============================================================================
+
+# Check metrics are working:
+curl http://localhost:3000/metrics
+
+# Should show Prometheus metrics format:
+# kynda_active_sessions 0
+# kynda_bandwidth_bytes_bucket{le="1000"} 0
+# ...
+
+# Access Grafana:
+# 1. Open: http://localhost:3001
+# 2. Login: admin / admin123 (set in docker-compose.yml)
+# 3. Go to Dashboards
+# 4. See "Kynda Call System" dashboard
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+# Prometheus & Grafana are OPTIONAL for development
+# They provide monitoring and metrics visualization
+# Essential for production but not required for testing
+
+# If you don't need them right now:
+# - Comment out prometheus and grafana services in docker-compose.yml
+# - Skip metrics.service.js setup
+# - Your call system will work perfectly without them

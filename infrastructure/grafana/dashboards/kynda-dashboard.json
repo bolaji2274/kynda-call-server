@@ -1,0 +1,64 @@
+
+
+{
+  "dashboard": {
+    "title": "Kynda Call System",
+    "tags": ["kynda", "webrtc"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Connections",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "kynda_active_sessions",
+            "legendFormat": "Active Sessions"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Bandwidth Usage",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(kynda_bandwidth_bytes[5m])",
+            "legendFormat": "Bandwidth"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Connection Quality",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "avg(kynda_quality_score)",
+            "legendFormat": "Avg Quality"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Packet Loss",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+        "targets": [
+          {
+            "expr": "avg(kynda_packet_loss)",
+            "legendFormat": "Packet Loss %"
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}
