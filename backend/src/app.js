@@ -15,6 +15,18 @@ const rateLimitMiddleware = require('./middleware/rateLimit.middleware');
 const sessionRoutes = require('./routes/session.routes');
 const callRoutes = require('./routes/call.routes');
 const socketHandlers = require('./socket');
+const metricsService = require('./services/metrics.service');
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', metricsService.getContentType());
+    res.end(await metricsService.getMetrics());
+  } catch (error) {
+    res.status(500).end(error.message);
+  }
+});
+
 
 class KyndaCallServer {
   constructor() {
@@ -118,6 +130,8 @@ class KyndaCallServer {
 
     console.log('✓ Routes configured');
   }
+
+  
 
   setupSocketIO() {
     this.io = socketIO(this.server, {
