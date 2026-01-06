@@ -1,8 +1,8 @@
-# ============================================================================
-# FILE 5: backend/src/services/metrics.service.js (FOR PROMETHEUS METRICS)
-# ============================================================================
+// # ============================================================================
+// # FILE 5: backend/src/services/metrics.service.js (FOR PROMETHEUS METRICS)
+// # ============================================================================
 
-# Copy this JavaScript code to: backend/src/services/metrics.service.js
+// # Copy this JavaScript code to: backend/src/services/metrics.service.js
 
 const promClient = require('prom-client');
 
